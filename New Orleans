@@ -73,7 +73,7 @@ Meaning that if I break right after this function returns, and observe the 7 byt
 
 We could also just go ahead and convert each of these bytes to decimal instead of breaking and looking at the live memory dump but im too lazy so.
 
-I set a break point at 44b0, restarted, and upon breaking i entered <strong>read 2400 8</strong> into the console.
+I set a break point at 44b0, restarted, and upon breaking i entered "read 2400 8" into the console.
 
 2400:   4b48 3f56 5224 2400  KH?VR$$.
 
