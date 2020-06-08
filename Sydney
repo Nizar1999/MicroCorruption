@@ -1,0 +1,97 @@
+First as always reading the new manual.
+
+    This is  Software Revision 02.  We have received reports  that the
+    prior  version of  the  lock was  bypassable  without knowing  the
+    password. We have fixed this and removed the password from memory.
+    
+Yes indeed it was.
+After the last challenge ill be taking the manual at face value and looking to the code for guidance.
+First 3 functions seem to be normal just like the last challenge.
+
+<__do_copy_data> and <__do_clear_bss> seem to be doing the same as before.
+Onwards to <main>.
+
+4438 <main>
+4438:  3150 9cff      add	#0xff9c, sp
+443c:  3f40 b444      mov	#0x44b4 "Enter the password to continue.", r15
+4440:  b012 6645      call	#0x4566 <puts>
+4444:  0f41           mov	sp, r15
+4446:  b012 8044      call	#0x4480 <get_password>
+444a:  0f41           mov	sp, r15
+444c:  b012 8a44      call	#0x448a <check_password>
+4450:  0f93           tst	r15
+4452:  0520           jnz	#0x445e <main+0x26>
+4454:  3f40 d444      mov	#0x44d4 "Invalid password; try again.", r15
+4458:  b012 6645      call	#0x4566 <puts>
+445c:  093c           jmp	#0x4470 <main+0x38>
+445e:  3f40 f144      mov	#0x44f1 "Access Granted!", r15
+4462:  b012 6645      call	#0x4566 <puts>
+4466:  3012 7f00      push	#0x7f
+446a:  b012 0245      call	#0x4502 <INT>
+446e:  2153           incd	sp
+4470:  0f43           clr	r15
+4472:  3150 6400      add	#0x64, sp
+
+No <create_password> this time.
+Instead its asking me to enter the password and calling the <puts> function.
+Inspecting the lock manual at https://microcorruption.com/manual.pdf reveals that the <puts> function is used to print out a string to stdout, and as such I'll be ignoring any calls to <puts> from now on.
+Anyways.
+
+After entering the password there is a call to <get_password> which judging by the name just "gets" the password we entered, then we are calling <check_password> (443c) and checking if r15 is set to 0 (4450), if it is then the password is incorrect and we get an error and the execution ends.
+
+However if r15 is set to 1 we take the jump at 4452 to 445e which grants us access by calling <INT> with the value 0x7f. Inspecting the lock manual again, reveals to us that calling interrupt with this value just opens the door.
+
+Therefore, I will assume that r15 is set to 0 or 1 in <check_password>.
+
+448a <check_password>
+448a:  bf90 6128 0000 cmp	#0x2861, 0x0(r15)
+4490:  0d20           jnz	$+0x1c
+4492:  bf90 294b 0200 cmp	#0x4b29, 0x2(r15)
+4498:  0920           jnz	$+0x14
+449a:  bf90 5771 0400 cmp	#0x7157, 0x4(r15)
+44a0:  0520           jne	#0x44ac <check_password+0x22>
+44a2:  1e43           mov	#0x1, r14
+44a4:  bf90 6734 0600 cmp	#0x3467, 0x6(r15)
+44aa:  0124           jeq	#0x44ae <check_password+0x24>
+44ac:  0e43           clr	r14
+44ae:  0f4e           mov	r14, r15
+44b0:  3041           ret
+
+Interesting.
+Let's go through this. (Note that since r15 is being used with offsets and compared to certain values I will just assume that it holds the password we entered, so keep that in mind.)
+
+448a:  bf90 6128 0000 cmp	#0x2861, 0x0(r15)
+4490:  0d20           jnz	$+0x1c
+
+Here its cmp instead of cmp.b like last time, so I consulted the chip manual at https://www.ti.com/lit/ug/slau144j/slau144j.pdf page 56 and found this section regarding the instructions.
+
+All single-operand and dual-operand instructions can be byte or word instructions by using .B or .W
+extensions. Byte instructions are used to access byte data or byte peripherals. Word instructions are used
+to access word data or word peripherals. If no extension is used, the instruction is a word instruction.
+
+This means that we're comparing a word at a time.
+That would also explain why were offsetting by 0x0, 0x2, 0x4 and 0x6.
+We set r14 to 1 (44a2), and if the password is correct were setting r15 to 1 since we take the jump at 44aa to 44ae thus skipping the instruction that clears r14.
+This means that we need to not take the jumps at 4490 4498 44a0 since they will also take us to 44ac and set r15 to 0.
+(Note: 4490:  The $+0x1c in 
+0d20           jnz	$+0x1c   
+just means (current address) + 0x1c which would result in 44ac. Same applied to 4498)
+
+Therefore, if the password is correct then it needs to pass all these compares. Meaning that the password is..
+
+28614b2971573467
+this is all in hex by the way so we need to check the hex box when were entering the password.
+
+Spoiler. This wont work.
+
+The issue is revealed if we consult the wikipedia page for MSP430.
+"The MSP430 CPU uses a von Neumann architecture, with a single address space for instructions and data. Memory is byte-addressed, and pairs of bytes are combined little-endian to make 16-bit words."
+
+It uses a little-endian system. This means that we need to invert the bytes of each word as follows:
+instead of 2861 we need to enter 6128 and instead of 4b29 we enter 294b etc..
+Resulting in
+6128294b57716734
+
+Door unlocked.
+
+(Note: More about endianess here https://en.wikipedia.org/wiki/Endianness)
