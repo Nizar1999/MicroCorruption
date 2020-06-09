@@ -136,10 +136,10 @@ That flag is 0 if the password is incorrect so I guess all we have to do now is 
 
 As I've mentioned before, the byte at 0x2410 needs to be 0x4e.
 And the password begins at 0x2400, meaning that we need to enter 16 bytes of junk followed by 4e.
+This is going to work since we can actually read more than 16 bytes into the buffer.
 
 I decided id use python to generate that for me cause im too lazy
 print(16 * 'aa', '4e', sep = '')
 
 Just check hex now and enter aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4e
 Door Unlocked.
-I guess I was wrong about the buffer overflow lul.
